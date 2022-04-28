@@ -34,6 +34,21 @@ def count_calls(method: Callable) -> Callable:
         return method(self, *args, **kwds)
     return wrapper
 
+def replay(method: Callable):
+    """ display the history call """
+    method_key = method.__qualname__
+    inputs = method_key + ":inputs"
+    outputs = method_key + ":outputs"
+    redis = method.__self__._redis
+    count = redis.get(method_key).decode("utf-8")
+    print("{} was called {} times:".format(method_key, count))
+    ListInput = redis.lrange(inputs, 0, -1)
+    ListOutput = redis.lrange(outputs, 0, -1)
+    allData = list(zip(ListInput, ListOutput))
+    for key, data in allData:
+        attr, data = key.decode("utf-8"), data.decode("utf-8")
+        print("{}(*{}) -> {}".format(method_key, attr, data))
+
 class Cache:
     """A Cache class"""
 
@@ -42,6 +57,7 @@ class Cache:
         self._redis = redis.Redis()
         self._redis.flushdb()
 
+    @call_history
     @count_calls
     def store(self, data: Union[str, bytes, int, float]) -> str:
         """stores key value in redis server"""
